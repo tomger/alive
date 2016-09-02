@@ -1,0 +1,25 @@
+{
+  "name": "Alive",
+  "description": "xxx",
+  "author": "xxx",
+  "homepage": "xxx",
+  "version": 0.9,
+  "identifier": "us.iterator.alive",
+  "updateURL": "http://xxx",
+  "compatibleVersion": 3,
+  "bundleVersion": 1,
+  "commands": [
+    {
+      "name": "Upload",
+      "identifier": "alive-upload",
+      "shortcut": "ctrl alt a",
+      "script": "main.js",
+      "handler": "upload"
+    }
+  ],
+  "menu": {
+    "items": [
+      "alive-upload"
+    ]
+  }
+}
