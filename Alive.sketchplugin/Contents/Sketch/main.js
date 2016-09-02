@@ -1,47 +1,49 @@
+var config = {
+  url: 'http://127.0.0.1/upload',
+  debug: true
+};
 
 function yell(msg) {
   NSApplication.sharedApplication().orderedDocuments().firstObject().showMessage(msg);
 }
 
-function helloworld(context) {
-  alex_uploadLayers(context);
-}
-
-function alex_uploadLayers(context) {
-  log('alex_uploadLayers')
-  var count = 0;
+function upload(context) {
+  log('uploadLayers')
   var document = context.document;
-  var project = getProjectName(document);
   var selection = context.selection;
   var loop = selection.objectEnumerator();
 
-  // loop over all selected objects
+  // loop over all selected objects and only handle Artboards
   while ((item = loop.nextObject()) !== null) {
     if (item.className() != "MSArtboardGroup") {
       continue;
     }
-    count++;
-    var layers = alex_encodeLayer(item, document);
-    var payload = {
-      layers: layers,
-      width: Number(item.rect().size.width),
-      height: Number(item.rect().size.height),
-      objectID: String(item.objectID())
-    }
-    // HTTP POST it
-    alex_postFile(null, item.name(), project, payload);
+    var session = String(Date.now()) + String(Math.round(Math.random() * 1000));
+    uploadArtboard(item, session, document);
   }
-  document.showMessage("uploaded by " + config.email + ' to ' + config.url + '.');
 }
 
-function alex_encodeLayer(layer, document) {
+function uploadArtboard(artboard, session, document) {
+  var layers = uploadLayer(artboard, session, document);
+  var artboardMetaInfo = {
+    layers: layers,
+    width: Number(artboard.rect().size.width),
+    height: Number(artboard.rect().size.height),
+    objectID: String(artboard.objectID())
+  }
+  postJSON(artboardMetaInfo, session);
+  document.showMessage('Uploaded artboard to ' + config.url + '.');
+}
+
+function uploadLayer(layer, session, document) {
+  log('uploadLayer')
+
   // upload png slice
   var path = NSTemporaryDirectory() + String(layer.objectID()) + ".png";
-  log(path, layer)
   var rect = [MSSliceTrimming trimmedRectForSlice:layer]; // layer
   var slice = [MSExportRequest requestWithRect:rect scale:2];
   [document saveArtboardOrSlice:slice toFile: path];
-  alex_postFile(path, layer.name(), "", {});
+  postFile(path, layer.name(), session);
 
   // add the png to the tree
   var rv = {
@@ -56,42 +58,47 @@ function alex_encodeLayer(layer, document) {
       rv.l = [];
     }
     var child = layer.layers().objectAtIndex(i);
-    rv.l.push(alex_encodeLayer(child, document));
+    rv.l.push(uploadLayer(child, session, document));
   }
   return rv;
 }
 
-function alex_postFile(path, name, project, payload) {
-
-  var dataImg = [[NSFileManager defaultManager] contentsAtPath:path];
-  var postLength = [dataImg length].toString()
-
-  var task = NSTask.alloc().init()
-  task.setLaunchPath("/usr/bin/curl");
-    // "--proxy", "localhost:8888",
-
+function postJSON(json, session) {
   var args = NSArray.arrayWithObjects(
-    "-v",
-    "POST",
+    "-v", "POST",
     "--header", "Content-Type: multipart/form-data",
-    "--header", "User-Agent: IteratorPlugin",
-    "-F", "key=" + config.key,
-    "-F", "email=" + config.email,
-    "-F", "project=" + project,
-    "-F", "payload=" + JSON.stringify(payload),
+    "-F", "session=" + session,
+    "-F", "payload=" + JSON.stringify(json),
+      config.url + '/upload',
+    nil);
+  post(args);
+}
+
+function postFile(path, name, session) {
+  log('postFile')
+  var args = NSArray.arrayWithObjects(
+    "-v", "POST",
+    "--header", "Content-Type: multipart/form-data",
+    "-F", "session=" + session,
     "-F", "name=image; filename=" + name + "; Content-Type=image/png;",
     "-F", "image=@" + path,
       config.url + '/upload',
     nil);
+  post(args);
+}
 
+function post(args) {
+  log('post')
+  var task = NSTask.alloc().init()
+  task.setLaunchPath("/usr/bin/curl");
   task.setArguments(args);
-
   var outputPipe = [NSPipe pipe];
   [task setStandardOutput:outputPipe];
   task.launch();
   var outputData = [[outputPipe fileHandleForReading] readDataToEndOfFile];
   var outputString = [[[NSString alloc] initWithData:outputData encoding:NSUTF8StringEncoding]];
-  if (DEBUG == true) {
+  if (config.debug == true) {
     log(outputString)
   }
+  return outputString;
 }
