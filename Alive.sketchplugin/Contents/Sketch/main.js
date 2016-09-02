@@ -31,7 +31,7 @@ function uploadArtboard(artboard, session, document) {
     height: Number(artboard.rect().size.height),
     objectID: String(artboard.objectID())
   }
-  postJSON(artboardMetaInfo, session);
+  post(createJSONRequest(artboardMetaInfo, session));
   document.showMessage('Uploaded artboard to ' + config.url + '.');
 }
 
@@ -43,7 +43,7 @@ function uploadLayer(layer, session, document) {
   var rect = [MSSliceTrimming trimmedRectForSlice:layer]; // layer
   var slice = [MSExportRequest requestWithRect:rect scale:2];
   [document saveArtboardOrSlice:slice toFile: path];
-  postFile(path, layer.name(), session);
+  post(createFileRequest(path, layer.name(), session));
 
   // add the png to the tree
   var rv = {
@@ -63,20 +63,18 @@ function uploadLayer(layer, session, document) {
   return rv;
 }
 
-function postJSON(json, session) {
-  var args = NSArray.arrayWithObjects(
+function createJSONRequest(json, session) {
+  return NSArray.arrayWithObjects(
     "-v", "POST",
     "--header", "Content-Type: multipart/form-data",
     "-F", "session=" + session,
     "-F", "payload=" + JSON.stringify(json),
       config.url + '/upload',
     nil);
-  post(args);
 }
 
-function postFile(path, name, session) {
-  log('postFile')
-  var args = NSArray.arrayWithObjects(
+function createFileRequest(path, name, session) {
+  return NSArray.arrayWithObjects(
     "-v", "POST",
     "--header", "Content-Type: multipart/form-data",
     "-F", "session=" + session,
@@ -84,7 +82,6 @@ function postFile(path, name, session) {
     "-F", "image=@" + path,
       config.url + '/upload',
     nil);
-  post(args);
 }
 
 function post(args) {
