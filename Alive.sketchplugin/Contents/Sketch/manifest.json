@@ -10,10 +10,10 @@
   "bundleVersion": 1,
   "commands": [
     {
-      "name": "Upload",
+      "name": "Upload and Open (alive.iterator.us)",
       "identifier": "alive-upload",
       "shortcut": "ctrl alt a",
-      "script": "main.js",
+      "script": "framerWrapper.js",
       "handler": "upload"
     }
   ],
