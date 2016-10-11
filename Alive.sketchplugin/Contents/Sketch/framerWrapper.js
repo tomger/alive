@@ -2,17 +2,44 @@
 
 var debugConfig = {
   url: 'http://127.0.0.1:3001/upload',
-  projectUrl: 'http://127.0.0.1:3000/',
+  projectUrl: 'http://127.0.0.1:3000/edit/',
   debug: true
 };
 
-var config = {
-  url: 'http://alive.iterator.us:3001/upload',
-  projectUrl: 'http://alive.iterator.us:3000/',
-  debug: true
+var releaseConfig = {
+  url: 'http://alive.iterator.us/upload',
+  projectUrl: 'http://alive.iterator.us/edit/',
+  debug: false
 };
 
-// config = debugConfig;
+// var config = debugConfig;
+var config = releaseConfig;
+
+function open(context) {
+  var documentId = getDocumentId(context);
+  openBrowser(config.projectUrl + documentId);
+}
+
+function uploadAndOpen(context) {
+  log("let's do this");
+  showMessage('Alive: Slicing layers...');
+  var documentId = getDocumentId(context);
+  var rv = _main({
+    scale: 2,
+    destinationPath: '/project'
+  });
+
+  showMessage('Alive: Uploading layers...');
+  recursiveUpload(rv.layers, rv.path, documentId);
+  var request = createJSONRequest(rv.layers, documentId);
+  post(request);
+
+  if (!config.debug) {
+    openBrowser(config.projectUrl + documentId);
+  }
+}
+
+//////// HELPERS ////////
 
 function showMessage(message) {
   NSApplication.sharedApplication().orderedDocuments().firstObject().showMessage(message);
@@ -33,22 +60,6 @@ function getDocumentId(context) {
   return createHash(String(context.document.currentPage().objectID()));
 }
 
-function upload(context) {
-  log("let's do this");
-  showMessage('Alive: Slicing layers...');
-  var documentId = getDocumentId(context);
-  var rv = _main({
-    scale: 2,
-    destinationPath: '/project'
-  });
-
-  showMessage('Alive: Uploading layers...');
-  recursiveUpload(rv.layers, rv.path, documentId);
-  var request = createJSONRequest(rv.layers, documentId);
-  post(request);
-  openBrowser(config.projectUrl + documentId);
-}
-
 function getArtboardByName(document, name) {
   var page = document.currentPage();
   return page.artboards().find(function(artboard) {
@@ -56,10 +67,21 @@ function getArtboardByName(document, name) {
   });
 }
 
+function generateThumbnailForArtboard(document, artboard) {
+  var rect = [MSSliceTrimming trimmedRectForSlice: artboard];
+  var slice = [MSExportRequest requestWithRect:rect scale:0.5];
+  var path = [NSTemporaryDirectory(), artboard.objectID(), '.png'].join('');
+  document.saveArtboardOrSlice_toFile_(slice, path);
+  return path;
+}
+
 function recursiveUpload(layers, imagePath, documentId) {
   var layer;
   var request;
   var path;
+  var artboard;
+  var document = getActiveDocument(NSApplication.sharedApplication());
+
   for (var i = 0; i < layers.length; i++) {
     layer = layers[i];
     if (layer.image) {
@@ -68,14 +90,14 @@ function recursiveUpload(layers, imagePath, documentId) {
       post(request);
     }
     if (layer.kind == "artboard") {
-      var document = getActiveDocument(NSApplication.sharedApplication());
-      var artboard = getArtboardByName(document, layer.name);
-      var rect = [MSSliceTrimming trimmedRectForSlice: artboard];
-      var slice = [MSExportRequest requestWithRect:rect scale:0.5];
-      var path = [NSTemporaryDirectory(), artboard.objectID(), '.png'].join('');
-      [document saveArtboardOrSlice:slice toFile: path];
-      request = createFileRequest(path, layer.name, documentId);
-      post(request);
+      try {
+        artboard = getArtboardByName(document, layer.originalName);
+        path = generateThumbnailForArtboard(document, artboard);
+        request = createFileRequest(path, layer.name, documentId);
+        post(request);
+      } catch (err) {
+        log('recursiveUpload: Error generating thumbnail, ', err)
+      }
     }
     recursiveUpload(layer.children, imagePath, documentId);
   }
@@ -107,7 +129,8 @@ function post(args) {
 }
 
 function openBrowser(url) {
-  run("/usr/bin/open", NSArray.arrayWithObjects("-a", "Safari", "-g", url, nil));
+  // [[NSWorkspace sharedWorkspace] openFile:url withApplication:"Safari"];
+  run("/usr/bin/open", NSArray.arrayWithObjects("-a", "Safari", url, nil));
 }
 
 function run(path, args) {

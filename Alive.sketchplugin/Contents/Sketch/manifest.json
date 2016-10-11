@@ -10,16 +10,23 @@
   "bundleVersion": 1,
   "commands": [
     {
-      "name": "Upload and Open (alive.iterator.us)",
+      "name": "Upload current page and open editor",
       "identifier": "alive-upload",
       "shortcut": "ctrl alt a",
       "script": "framerWrapper.js",
-      "handler": "upload"
+      "handler": "uploadAndOpen"
+    },
+    {
+      "name": "Open editor for current page",
+      "identifier": "alive-open",
+      "script": "framerWrapper.js",
+      "handler": "open"
     }
   ],
   "menu": {
     "items": [
-      "alive-upload"
+      "alive-upload",
+      "alive-open"
     ]
   }
 }
